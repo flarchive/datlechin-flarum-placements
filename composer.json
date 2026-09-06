@@ -1,0 +1,108 @@
+{
+    "name": "datlechin/flarum-placements",
+    "description": "An ad server for Flarum: campaigns, targeting, scheduling and reporting, served from placements declared in code.",
+    "keywords": [
+        "flarum",
+        "ads",
+        "advertising",
+        "adsense",
+        "banner",
+        "sponsor",
+        "placement"
+    ],
+    "type": "flarum-extension",
+    "license": "MIT",
+    "support": {
+        "issues": "https://github.com/datlechin/flarum-placements/issues",
+        "source": "https://github.com/datlechin/flarum-placements"
+    },
+    "homepage": "https://nqd.vn",
+    "funding": [
+        {
+            "type": "github",
+            "url": "https://github.com/sponsors/datlechin"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "flarum/core": "^2.0",
+        "jaybizzle/crawler-detect": "^1.2"
+    },
+    "authors": [
+        {
+            "name": "Ngo Quoc Dat",
+            "email": "datlechin@gmail.com",
+            "role": "Developer"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Datlechin\\Placements\\": "src/"
+        }
+    },
+    "extra": {
+        "flarum-extension": {
+            "title": "Placements",
+            "category": "feature",
+            "icon": {
+                "name": "fas fa-rectangle-ad",
+                "color": "#fff",
+                "backgroundColor": "#2e5c8a"
+            }
+        },
+        "flarum-cli": {
+            "modules": {
+                "admin": true,
+                "forum": true,
+                "js": true,
+                "jsCommon": true,
+                "css": true,
+                "locale": true,
+                "gitConf": true,
+                "githubActions": true,
+                "prettier": true,
+                "typescript": true,
+                "bundlewatch": true,
+                "frontendTesting": true,
+                "backendTesting": true,
+                "phpstan": true,
+                "editorConfig": true,
+                "styleci": true
+            }
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "autoload-dev": {
+        "psr-4": {
+            "Datlechin\\Placements\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": [
+            "@test:unit",
+            "@test:integration"
+        ],
+        "test:unit": "phpunit -c tests/phpunit.unit.xml",
+        "test:integration": "phpunit -c tests/phpunit.integration.xml",
+        "test:setup": "@php tests/integration/setup.php",
+        "analyse:phpstan": [
+            "@php tests/phpstan-setup.php",
+            "phpstan analyse"
+        ],
+        "clear-cache:phpstan": "phpstan clear-result-cache"
+    },
+    "scripts-descriptions": {
+        "test": "Runs all tests.",
+        "test:unit": "Runs all unit tests.",
+        "test:integration": "Runs all integration tests.",
+        "test:setup": "Sets up a database for use with integration tests. Execute this only once.",
+        "analyse:phpstan": "Run static analysis"
+    },
+    "require-dev": {
+        "flarum/testing": "^2.0",
+        "flarum/phpstan": "^2.0",
+        "flarum/gdpr": "*",
+        "flarum/tags": "*"
+    }
+}

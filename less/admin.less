@@ -1,0 +1,1028 @@
+@import 'common.less';
+
+// The admin panel renders the same slot markup when previewing a creative, so
+// it needs the rules in `common.less` too. Everything below is admin-only.
+//
+// Nothing here declares a colour of its own. Every one is a core custom
+// property, so the panel follows whatever theme is active -- including the
+// dark and high-contrast schemes -- without this file knowing they exist.
+// Inline directions are logical properties, for right-to-left.
+//
+// This file is not much shorter than the one it replaces -- 69 top-level
+// selectors against 60 -- and it would be dishonest to present it as a purge.
+// The interface it dresses is simply larger: there was no tab strip, no search
+// and filter bar, no campaign page and no pager before.
+//
+// What changed is what the selectors are for. The old file hand-built a
+// section header, a records list, a status pill, a stat tile and a data table,
+// all of which core already ships -- `FormSection`, `Table`, `Pill`,
+// `InfoTile`, `Pagination` -- and it drew a status pill by misusing `Badge`,
+// which is a 22-pixel circle whose label is `display: none`. Those are gone.
+// The admin screens imported seven core components; they now import eighteen.
+//
+// What is left is layout glue, plus the three things core genuinely has no
+// equivalent for: a paintable schedule grid, a dependency-free delivery chart,
+// and a preview frame.
+
+// A row of controls that sit side by side and wrap on a narrow panel.
+//
+// Defined once. There were four near-identical copies of this: a flight's two
+// dates, a frequency cap's number and window, an image's width and height, and
+// the repeatable rows of the pair editors -- the same idea written out each
+// time somebody needed it.
+.placement-row() {
+  display: flex;
+
+  // Stated, not assumed. Core's `.FieldSet-items` is already a flex *column*,
+  // and this mixin is called into it: without resetting the direction, the
+  // `flex: 1 1 140px` below became a 140px **height** on every child and the
+  // three reserved-height fields were drawn as a stack of tall empty boxes
+  // rather than as a row. The other callers are plain divs, where this is a
+  // no-op.
+  flex-direction: row;
+
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-start;
+
+  // Without this, a row that wraps inside a container taller than its content
+  // has its lines spread to fill the height. In the slot configure panel that
+  // put 80px of dead space between "Phone", "Tablet" and "Desktop", because
+  // the panel had already been stretched to the height of its tallest column.
+  align-content: flex-start;
+
+  > * {
+    flex: 1 1 140px;
+    margin: 0;
+  }
+}
+
+// -------------------------------------------------------------------------
+// The page and its tabs
+// -------------------------------------------------------------------------
+
+.PlacementsPage-tabs {
+  // No margin of its own. Core's `.ExtensionPage-settings` already opens the
+  // section with 20px of margin and 10px of padding; adding 20px more here
+  // made the gap above the tab strip 50px against the 20px used between every
+  // other block on the page, which is what made the spacing look accidental
+  // rather than deliberate.
+  margin-block-start: 0;
+}
+
+.PlacementsPage-content {
+  padding-block-start: 20px;
+}
+
+// The count of what is waiting, on the tab that decides it.
+.PlacementsPage-count {
+  display: inline-block;
+  min-width: 18px;
+  margin-inline-start: 6px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--control-danger-bg);
+  color: var(--control-danger-color);
+  font-size: 11px;
+  font-weight: bold;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.PlacementsTab {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+// -------------------------------------------------------------------------
+// The row above a table
+// -------------------------------------------------------------------------
+
+// Two columns: everything on the left, the primary action pinned to the right.
+//
+// A flex row let the filters push the button onto a line of its own, so it
+// moved whenever a list gained a filter. Giving the button its own row instead
+// fixed that but left a full-width empty band beside it. A grid does both:
+// the button never moves, and the filters wrap inside the space left over
+// rather than beneath it.
+.PlacementToolbar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px 15px;
+  align-items: end;
+
+  &-filters {
+    grid-column: 1;
+    grid-row: 1;
+
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: flex-end;
+    min-width: 0;
+  }
+
+  &-search {
+    flex: 1 1 220px;
+    min-width: 180px;
+  }
+
+  &-choice {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    font-weight: normal;
+  }
+
+  &-choiceLabel {
+    color: var(--muted-color);
+    font-size: 12px;
+  }
+
+  // The slots tab puts a description here instead of filters.
+  &-help {
+    grid-column: 1;
+    grid-row: 1;
+    margin: 0;
+  }
+
+  &-actions {
+    grid-column: 2;
+    grid-row: 1;
+
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-self: end;
+  }
+}
+
+.PlacementNotice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 15px;
+  border-radius: var(--border-radius);
+  background: var(--control-bg);
+  color: var(--control-color);
+}
+
+// -------------------------------------------------------------------------
+// Tables
+//
+// The element is core's `.Table`; these are the cell treatments it has no
+// opinion about.
+// -------------------------------------------------------------------------
+
+// `.Table()` and `.loading-container()` are parametric mixins in core: the
+// parentheses mean Less emits no class of those names, so markup that says
+// `class="Table"` gets a bare browser table on an otherwise themed page. They
+// have to be called into a selector of our own.
+.PlacementTable-container {
+  // A table of campaigns is wider than a phone. It scrolls inside its own box
+  // rather than making the page scroll sideways.
+  overflow-x: auto;
+
+  // Dims the rows and floats a spinner over them while the next page arrives,
+  // instead of blanking the table and losing the reader's place.
+  &--loading {
+    .loading-container();
+  }
+}
+
+.PlacementTable {
+  .Table();
+
+  // Fills its container rather than shrinking to its contents, so the table
+  // lines up with the toolbar and the figures above it.
+  width: 100%;
+
+  // Core's `.Table()` was written for the users page: a checkbox, an icon
+  // above each heading, and one dropdown per row. Two of its defaults are
+  // wrong for a data table and both were visible on every screen here.
+  //
+  // The first centres every heading, which puts each one over the middle of a
+  // column whose cells are aligned to the start (or, for figures, to the end).
+  thead th {
+    text-align: start;
+    padding: 12px 15px;
+
+    // The second turns any icon inside `thead` into a block with a margin
+    // under it. The sort arrow belongs to the heading's own button, so that
+    // rule broke every sortable heading onto two lines and made the header
+    // row half again as tall as it needed to be.
+    .icon {
+      display: inline-block;
+      width: auto;
+      margin-bottom: 0;
+    }
+  }
+
+  // Digits line up in a column so two figures can be compared by their length
+  // as well as read. Stated for the heading too, and at the same specificity
+  // as the rule above, so the heading follows its column rather than fighting
+  // it.
+  thead th&-number,
+  tbody td&-number,
+  thead th&-controls,
+  tbody td&-controls {
+    text-align: end;
+  }
+
+  &-number {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  // The row's own actions. Core gives this cell no width and no opinion about
+  // wrapping, so two icon buttons in a column the browser had sized at 93px
+  // stacked one above the other -- which is what made the rows ragged, since
+  // only the rows that could be paused had two.
+  &-controls {
+    width: 1%;
+    white-space: nowrap;
+    text-align: end;
+
+    &-item {
+      // Two of the mixin's defaults have to come back off here. It gives the
+      // item `padding: 10px 15px` and, further down, `width: 100%` -- correct
+      // for core, where a row's controls are the items of a dropdown menu and
+      // each one is a full-width strip. These are icon buttons in a cell, so
+      // full width meant every one of them was as wide as the whole column:
+      // four of them overflowed a 134px cell by three hundred pixels and were
+      // clipped by the container's own scroll.
+      width: auto;
+      min-width: 30px;
+      padding: 6px;
+      vertical-align: middle;
+    }
+
+    .Button + .Button {
+      margin-inline-start: 2px;
+    }
+  }
+
+  &-primary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  &-strong {
+    font-weight: 600;
+  }
+
+  &-muted {
+    color: var(--muted-color);
+  }
+
+  &-warning {
+    color: var(--control-warning-color, var(--muted-color));
+  }
+
+  &-code {
+    padding: 1px 5px;
+    border-radius: var(--border-radius);
+    background: var(--code-bg);
+    color: var(--code-color);
+    font-size: 12px;
+  }
+
+  &-link {
+    font-weight: 600;
+  }
+
+  // The heading is a button so it can be reached from the keyboard; it should
+  // still read as a heading.
+  &-sort {
+    display: inline-flex;
+    align-items: center;
+    font-weight: inherit;
+    font-size: inherit;
+    color: inherit;
+
+    // Padded to a target somebody can hit, then pulled back by the same
+    // amount so nothing moves. The heading is only 20px of text, which is
+    // fine to click and small to tap, and the cell's own padding around it
+    // was not part of the control.
+    padding: 6px 0;
+    margin: -6px 0;
+  }
+
+  &-sortIcon {
+    color: var(--muted-color);
+    font-size: 11px;
+
+    // Spaced from here rather than by a `gap` on the button. Core's `Button`
+    // wraps whatever it is given in `.Button-label > .Button-labelText`, so
+    // the heading and this icon are siblings inside that inner span and the
+    // button's own flex gap never falls between them.
+    margin-inline-start: 6px;
+  }
+}
+
+// -------------------------------------------------------------------------
+// Headline figures
+// -------------------------------------------------------------------------
+
+.PlacementFigures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 25px;
+  padding: 15px 20px;
+  border-radius: var(--border-radius);
+  background: var(--control-bg);
+}
+
+.PlacementFigure {
+  &-value {
+    color: var(--heading-color);
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &-label {
+    color: var(--muted-color);
+    font-size: 12px;
+  }
+}
+
+// -------------------------------------------------------------------------
+// One campaign's page
+// -------------------------------------------------------------------------
+
+.PlacementDetail {
+  &-back {
+    align-self: flex-start;
+    padding-inline: 0;
+  }
+
+  &-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 15px;
+    align-items: center;
+  }
+
+  &-title {
+    flex: 1 1 auto;
+    margin: 0;
+  }
+
+  &-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  &-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  &-note {
+    margin: 0;
+  }
+
+  &-summary {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6px 20px;
+    margin: 0;
+
+    dt {
+      color: var(--muted-color);
+      font-weight: normal;
+    }
+
+    dd {
+      margin: 0;
+    }
+  }
+
+  &-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    h4 {
+      margin: 0;
+    }
+  }
+
+  &-sectionHeader {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+// -------------------------------------------------------------------------
+// Slots
+// -------------------------------------------------------------------------
+
+.PlacementSlots-group {
+  margin-block-end: 25px;
+}
+
+.PlacementSlots-heading {
+  margin: 0 0 10px;
+  color: var(--muted-color);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.PlacementSlots {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--control-bg);
+  border-radius: var(--border-radius);
+
+  > li + li {
+    border-block-start: 1px solid var(--control-bg);
+  }
+}
+
+.PlacementSlots-item {
+  padding: 12px 15px;
+}
+
+.PlacementSlots-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 15px;
+  align-items: center;
+}
+
+.PlacementSlots-switch {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.PlacementSlots-facts {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.PlacementSlots-key {
+  padding: 1px 5px;
+  border-radius: var(--border-radius);
+  background: var(--code-bg);
+  color: var(--code-color);
+  font-size: 12px;
+}
+
+.PlacementSlots-size {
+  color: var(--muted-color);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.PlacementSlots-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.PlacementSlots-disclosure {
+  flex: 0 0 auto;
+
+  // A standalone control at the end of the row, rather than a link inside a
+  // sentence, so it gets a target rather than the 20px line box of its own
+  // label.
+  padding-block: 6px;
+}
+
+.PlacementSlots-description {
+  margin: 4px 0 0;
+}
+
+.PlacementSlots-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-block-start: 15px;
+  padding-block-start: 15px;
+  border-block-start: 1px solid var(--control-bg);
+
+  // Each column ends where its own content ends. Stretching them to a common
+  // height is what handed the reserved-height column 471px to spread three
+  // number fields across.
+  align-items: flex-start;
+
+  .FieldSet {
+    flex: 1 1 240px;
+  }
+
+  // Three fields rather than one, so it needs the room to keep them on a line
+  // instead of wrapping each onto its own.
+  .PlacementSlots-fieldset--inline {
+    flex: 2 1 380px;
+  }
+}
+
+.PlacementSlots-fieldset--inline .FieldSet-items {
+  .placement-row();
+
+  // Three fields holding at most four digits each. The mixin's 140px basis
+  // fits two of them across this column and drops the third onto a line of
+  // its own; these need far less than that.
+  > * {
+    flex: 1 1 100px;
+  }
+}
+
+.PlacementDiagnosis {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.PlacementDiagnosis-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.PlacementDiagnosis-slot {
+  flex: 1 1 160px;
+  font-weight: 600;
+}
+
+.PlacementDiagnosis-detail {
+  color: var(--muted-color);
+  font-size: 12px;
+}
+
+// -------------------------------------------------------------------------
+// The review queue
+// -------------------------------------------------------------------------
+
+.PlacementReview {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.PlacementReview-item {
+  padding: 15px;
+  border: 1px solid var(--control-bg);
+  border-radius: var(--border-radius);
+}
+
+.PlacementReview-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.PlacementReview-name {
+  padding: 0;
+  font-weight: 600;
+}
+
+.PlacementReview-meta {
+  color: var(--muted-color);
+  font-size: 12px;
+}
+
+.PlacementReview-reason {
+  margin-block-start: 8px;
+  padding: 8px 12px;
+  border-inline-start: 3px solid var(--control-danger-bg);
+  background: var(--body-bg-shaded, var(--control-bg));
+  border-radius: var(--border-radius);
+}
+
+.PlacementReview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-block-start: 12px;
+}
+
+.PlacementReview-rejection {
+  margin-block-start: 12px;
+}
+
+// -------------------------------------------------------------------------
+// Modals
+// -------------------------------------------------------------------------
+
+.PlacementModal-tabs {
+  margin-inline: -14px;
+
+  // Five tabs across a modal on a phone are wider than the modal, and core's
+  // `.Tabs-nav` neither wraps nor scrolls, so the last of them sat outside the
+  // dialog with nothing to reach it by. Same treatment as the page's own tab
+  // bar: one row, scrolled.
+  > .Tabs-nav {
+    overflow-x: auto;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+}
+
+.PlacementModal-tabContent {
+  padding: 20px 14px 0;
+  // Long forms scroll inside the modal rather than growing it past the
+  // viewport, so the save button below is always reachable.
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.PlacementModal-controls {
+  margin-block-start: 20px;
+}
+
+// -------------------------------------------------------------------------
+// Form groupings
+// -------------------------------------------------------------------------
+
+.PlacementFlight,
+.PlacementFrequency,
+.PlacementSize {
+  .placement-row();
+}
+
+// A date, a time and a two-digit number each need about a third of the space a
+// stretched form field gives them, and a control four times wider than
+// anything it can hold reads as a mistake rather than as room to grow.
+.PlacementFlight input[type='datetime-local'],
+.PlacementSize input[type='number'] {
+  max-width: 260px;
+}
+
+.PlacementPairs,
+.PlacementLogos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-block-end: 10px;
+}
+
+.PlacementPairs-row,
+.PlacementLogos-row {
+  .placement-row();
+
+  .Button--icon {
+    flex: 0 0 auto;
+  }
+}
+
+.PlacementPairs-name {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.PlacementPairs-warning {
+  color: var(--validation-error-color, var(--control-danger-color));
+  font-size: 12px;
+}
+
+.PlacementPicker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.PlacementPicker-slot .helpText {
+  margin: 2px 0 0;
+}
+
+// Flarum paints a modal body with `--control-bg`, and that is also the
+// background of a secondary `.Button` -- so inside a modal such a button is
+// exactly the colour behind it and reads as a line of text rather than as a
+// control. The form's own inputs sit on `--body-bg` there, so the actions
+// take the same surface and stop disappearing into it.
+.Modal {
+  .PlacementRules > .Button,
+  .DaypartGrid-actions > .Button {
+    background: var(--body-bg);
+  }
+}
+
+// The editor had no styles of its own at all, so its rows sat flush against
+// one another: four rules read as one block of controls rather than four
+// things, each of which can be removed on its own.
+.PlacementRules {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+
+  > .helpText {
+    margin: 0;
+  }
+
+  > .Button {
+    margin-block-start: 2px;
+  }
+}
+
+.PlacementRules-row {
+  .placement-row();
+
+  align-self: stretch;
+
+  // Each control fills the column it was given, so the three columns line up
+  // down the list instead of every select shrinking to its own longest
+  // option and leaving a ragged gap beside it.
+  .Select,
+  .Select-input,
+  .FormControl {
+    width: 100%;
+  }
+
+  .Button--icon {
+    flex: 0 0 auto;
+  }
+}
+
+.PlacementUserField-chosen {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.PlacementUserField-avatar {
+  --size: 24px;
+}
+
+// The report link, shown once and never again -- so it is selected on sight
+// and there is a button that copies it.
+.PlacementReportUrl {
+  .placement-row();
+
+  margin-block-end: 10px;
+
+  input {
+    flex: 1 1 240px;
+  }
+}
+
+.PlacementReportActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+// -------------------------------------------------------------------------
+// Settings
+// -------------------------------------------------------------------------
+
+.PlacementSettings {
+  .FieldSet + .FieldSet {
+    margin-block-start: 25px;
+  }
+}
+
+.PlacementSettings-storage {
+  margin-block-start: 10px;
+
+  p {
+    margin: 0 0 4px;
+  }
+
+  p:last-child {
+    margin-block-end: 0;
+  }
+}
+
+// -------------------------------------------------------------------------
+// The three things core has no equivalent for
+// -------------------------------------------------------------------------
+
+.DaypartGrid {
+  // Painting a schedule means dragging across cells, and a text selection
+  // following the pointer makes that unusable.
+  user-select: none;
+
+  &-scroll {
+    overflow-x: auto;
+  }
+
+  table {
+    border-collapse: collapse;
+  }
+
+  th {
+    padding: 0 4px;
+    color: var(--muted-color);
+    font-size: 10px;
+    font-weight: normal;
+    text-align: center;
+  }
+
+  &-day {
+    text-align: end;
+    white-space: nowrap;
+    padding-inline-end: 8px;
+  }
+}
+
+.DaypartGrid-cell {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid var(--body-bg);
+  background: var(--control-bg);
+  cursor: pointer;
+
+  &--on {
+    background: var(--primary-color);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--link-color);
+    outline-offset: -2px;
+  }
+}
+
+.DaypartGrid-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-block-start: 10px;
+
+  // Its own line, below the two presets. Sharing theirs put a sentence and
+  // two controls in one row with nothing to tell them apart.
+  .helpText {
+    flex: 1 1 100%;
+    margin: 0;
+  }
+}
+
+.DeliveryChart {
+  margin-block-end: 25px;
+}
+
+.DeliveryChart-svg {
+  display: block;
+  width: 100%;
+  height: 180px;
+}
+
+.DeliveryChart-grid {
+  stroke: var(--control-bg);
+  stroke-width: 1;
+}
+
+.DeliveryChart-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  // The viewBox is stretched to the container, so an unadjusted stroke would
+  // be drawn wider than it is tall.
+  vector-effect: non-scaling-stroke;
+}
+
+.DeliveryChart-area {
+  opacity: 0.12;
+  stroke: none;
+}
+
+.DeliveryChart-axis {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted-color);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.DeliveryChart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted-color);
+  font-size: 12px;
+
+  li {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+}
+
+.DeliveryChart-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.CreativePreview {
+  margin-block-start: 10px;
+  padding: 12px 15px;
+  border: 1px dashed var(--control-bg);
+  border-radius: var(--border-radius);
+}
+
+.CreativePreview-caption {
+  display: block;
+  margin-block-end: 8px;
+  color: var(--muted-color);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+// Bounded, because a creative is sized for a forum slot and the panel is
+// wider than any of them -- an unbounded leaderboard would misrepresent what
+// a reader sees.
+.CreativePreview-slot {
+  max-width: 728px;
+  margin: 0;
+}
+
+@media @phone {
+  // Six tabs do not fit a phone. Core's `.Tabs-nav` is a plain flex row with
+  // no wrap and no overflow -- its only consumer in core is the search modal,
+  // which has three -- so "Advertisers" and "Settings" sat past the right edge
+  // of a 345px viewport with no way to reach either of them. Scrolled rather
+  // than wrapped, so the row and its active underline stay one line.
+  .PlacementsPage-tabs > .Tabs-nav {
+    overflow-x: auto;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+
+  // The toolbar's search and its primary action stack rather than squeezing.
+  // One column, so the grid's second track collapses and the action lands
+  // under the filters instead of beside them.
+  .PlacementToolbar {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .PlacementToolbar-actions,
+  .PlacementToolbar-help {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: stretch;
+  }
+
+  .PlacementToolbar-filters {
+    grid-row: auto;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  // `flex-basis` is a height once the container is a column, so the search
+  // box's `flex: 1 1 220px` -- written for the row it is in on a desktop --
+  // asked for a field 220 pixels tall, and grew it from there. It rendered as
+  // an empty slab with its own magnifying glass floating in the middle of it.
+  .PlacementToolbar-search {
+    flex: 0 0 auto;
+  }
+
+  // Each select otherwise sizes to its own longest option, so a column of
+  // three filters ends up with three different right edges and three
+  // different tap targets.
+  .PlacementToolbar-choice .Select {
+    width: 100%;
+  }
+
+  .PlacementDetail-summary {
+    grid-template-columns: 1fr;
+    gap: 2px 0;
+
+    dd {
+      margin-block-end: 8px;
+    }
+  }
+}
