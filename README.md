@@ -2,13 +2,13 @@
 
 > **Read-only archive of released versions of datlechin/flarum-placements.** Not for installation: use [Packagist](https://packagist.org/packages/datlechin/flarum-placements) or the [upstream repository](https://github.com/datlechin/flarum-placements).
 
-**0** versions archived · Latest: [`v1.0.0`](https://github.com/flarchive/datlechin-flarum-placements/tree/archive/v1.0.0) · License: `MIT` · Flarum: `^2.0`
+**1** versions archived · Latest: [`v1.0.0`](https://github.com/flarchive/datlechin-flarum-placements/tree/archive/v1.0.0) · License: `MIT` · Flarum: `^2.0`
 
 ## Archived Versions
 
 | Version | Released | Flarum | Source |
 |---|---|---|---|
-| — | — | — | — |
+| `v1.0.0` | 2026-09-06 | `^2.0` | [Browse](https://github.com/flarchive/datlechin-flarum-placements/tree/archive/v1.0.0) |
 
 Catalog entry: [packages/datlechin-flarum-placements.json](https://github.com/flarchive/archive-index/blob/main/packages/datlechin-flarum-placements.json)
 
